@@ -1621,6 +1621,21 @@ type ObjectRef2 struct {
 	KMetadata
 }
 
+func (o ObjectRef2) MarshalJSON() ([]byte, error) {
+	name, namespace := o.GetName(), o.GetNamespace()
+	buf := make([]byte, 0, 7+12+7+len(name)+len(namespace))
+	buf = append(buf, '{')
+	if namespace != "" {
+		buf = append(buf, []byte(`"namespace":"`)...)
+		buf = append(buf, []byte(namespace)...)
+		buf = append(buf, '"', ',')
+	}
+	buf = append(buf, []byte(`"name":"`)...)
+	buf = append(buf, []byte(name)...)
+	buf = append(buf, '"', '}')
+	return buf, nil
+}
+
 func (o ObjectRef2) String() string {
 	namespace := o.GetNamespace()
 	if namespace != "" {
