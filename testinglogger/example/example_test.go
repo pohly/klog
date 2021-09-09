@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-logr/logr"
 	logrtesting "github.com/go-logr/logr/testing"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/testinglogger"
 )
@@ -66,6 +68,8 @@ func (k kmeta) GetNamespace() string {
 var _ klog.KMetadata = kmeta{}
 
 func exampleOutput(log logr.Logger) {
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "kube-system"}}
+
 	log.Info("hello world")
 	log.Error(err{msg: "some error"}, "failed")
 	log.V(1).Info("verbosity 1")
@@ -75,5 +79,7 @@ func exampleOutput(log logr.Logger) {
 		"float", 2.0,
 		"pair", pair{a: 1, b: 2},
 		"kobj", klog.KObj(kmeta{name: "sally", namespace: "kube-system"}),
+		"pod", klog.KObj(pod),
+		"pod2", klog.KObj2(pod),
 	)
 }
