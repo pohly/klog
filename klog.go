@@ -1190,6 +1190,13 @@ func (l *loggingT) lockAndFlushAll() {
 	l.mu.Unlock()
 }
 
+// FlushLogSink is an optional interface that LogSinks can implement when
+// they support and need to flush buffered log messages.
+// TODO: add to logr 1.2.0.
+type FlushLogSink interface {
+	Flush()
+}
+
 // flushAll flushes all the logs and attempts to "sync" their data to disk.
 // l.mu is held.
 func (l *loggingT) flushAll() {
@@ -1199,6 +1206,11 @@ func (l *loggingT) flushAll() {
 		if file != nil {
 			file.Flush() // ignore error
 			file.Sync()  // ignore error
+		}
+	}
+	if l.logr != nil {
+		if f, ok := l.logr.GetSink().(FlushLogSink); ok {
+			f.Flush()
 		}
 	}
 }
