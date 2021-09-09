@@ -8,10 +8,14 @@ package example
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/go-logr/logr"
 	logrtesting "github.com/go-logr/logr/testing"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -30,6 +34,19 @@ func TestLogr(t *testing.T) {
 			Verbosity:    5,
 		},
 	)
+	exampleOutput(log)
+}
+
+func TestZapr(t *testing.T) {
+	w := zapcore.AddSync(os.Stdout)
+	encoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+		MessageKey: "msg",
+		CallerKey:  "caller",
+		TimeKey:    "ts",
+	})
+	core := zapcore.NewCore(encoder, zapcore.AddSync(w), zap.DebugLevel)
+	l := zap.New(core, zap.WithCaller(false))
+	log := zapr.NewLogger(l)
 	exampleOutput(log)
 }
 
