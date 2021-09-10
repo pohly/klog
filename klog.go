@@ -90,6 +90,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
 
 	"k8s.io/klog/v2/internal/serialize"
 )
@@ -1552,12 +1553,15 @@ func SetLogFilter(filter LogFilter) {
 	logging.filter = filter
 }
 
-// ObjectRef references a kubernetes object
+// ObjectRef references a Kubernetes object. The intention is to log it as
+// <namespace>:<name> in plain text and
+// {"name":<name>, "namespace":<namespace>} in JSON.
 type ObjectRef struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// String provides the intended serialization for plain text output.
 func (ref ObjectRef) String() string {
 	if ref.Namespace != "" {
 		return fmt.Sprintf("%s/%s", ref.Namespace, ref.Name)
@@ -1565,15 +1569,26 @@ func (ref ObjectRef) String() string {
 	return ref.Name
 }
 
-// KMetadata is a subset of the kubernetes k8s.io/apimachinery/pkg/apis/meta/v1.Object interface
-// this interface may expand in the future, but will always be a subset of the
-// kubernetes k8s.io/apimachinery/pkg/apis/meta/v1.Object interface
+// MarshalLogObject ensures that zap logs the struct as intended instead
+// of using the output of String.
+func (ref ObjectRef) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddString("name", ref.Name)
+	if ref.Namespace != "" {
+		encoder.AddString("namespace", ref.Namespace)
+	}
+	return nil
+}
+
+// KMetadata is a subset of the Kubernetes k8s.io/apimachinery/pkg/apis/meta/v1.Object interface.
+// This interface may expand in the future (beware, API break!), but will always be a subset of the
+// Kubernetes k8s.io/apimachinery/pkg/apis/meta/v1.Object interface.
 type KMetadata interface {
 	GetName() string
 	GetNamespace() string
 }
 
-// KObj returns ObjectRef from ObjectMeta
+// KObj returns ObjectRef for an object that implements KMetadata, for
+// example *corev1.Pod.
 func KObj(obj KMetadata) ObjectRef {
 	if obj == nil {
 		return ObjectRef{}
