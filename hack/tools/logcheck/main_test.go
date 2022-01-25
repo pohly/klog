@@ -20,12 +20,15 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis/analysistest"
+
+	"k8s.io/klog/hack/tools/v2/logcheck/pkg"
 )
 
 func TestAnalyzer(t *testing.T) {
 	tests := []struct {
 		name              string
 		allowUnstructured string
+		filter            string
 		testPackage       string
 	}{
 		{
@@ -38,11 +41,22 @@ func TestAnalyzer(t *testing.T) {
 			allowUnstructured: "false",
 			testPackage:       "doNotAllowUnstructuredLogs",
 		},
+		{
+			name:              "Per-file config",
+			allowUnstructured: "true",
+			filter:            "testdata/src/mixed/structured_logging",
+			testPackage:       "mixed",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := analyser()
+			analyzer := pkg.Analyser()
 			analyzer.Flags.Set("allow-unstructured", tt.allowUnstructured)
+			if tt.filter != "" {
+				if err := analyzer.Flags.Set("structured-logging", tt.filter); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
 			analysistest.Run(t, analysistest.TestData(), analyzer, tt.testPackage)
 		})
 	}
