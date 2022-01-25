@@ -57,6 +57,11 @@ func TestAnalyzer(t *testing.T) {
 			allowUnstructured: "false",
 			testPackage:       "verbose",
 		},
+		{
+			name:              "gologr",
+			allowUnstructured: "false",
+			testPackage:       "gologr",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
