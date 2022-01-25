@@ -25,6 +25,7 @@ import (
 	"path"
 	"strings"
 
+	"go/types"
 	"golang.org/x/exp/utf8string"
 	"golang.org/x/tools/go/analysis"
 )
@@ -97,18 +98,8 @@ func checkForFunctionExpr(fexpr *ast.CallExpr, pass *analysis.Pass, c *config) {
 		// extracting function Name like Infof
 		fName := selExpr.Sel.Name
 
-		// for nested function cases klog.V(1).Infof scenerios
-		// if selExpr.X contains one more caller expression which is selector expression
-		// we are extracting klog and discarding V(1)
-		if n, ok := selExpr.X.(*ast.CallExpr); ok {
-			if _, ok = n.Fun.(*ast.SelectorExpr); ok {
-				selExpr = n.Fun.(*ast.SelectorExpr)
-			}
-		}
-
-		// extracting package name
-		pName, ok := selExpr.X.(*ast.Ident)
-		if ok && pName.Name == "klog" {
+		// Now we need to determine whether is is coming from klog.
+		if isKlog(selExpr.X, pass) {
 			// Matching if any unstructured logging function is used.
 			if !isUnstructured((fName)) {
 				// if format specifier is used, check for arg length will most probably fail
@@ -141,6 +132,39 @@ func checkForFunctionExpr(fexpr *ast.CallExpr, pass *analysis.Pass, c *config) {
 			}
 		}
 	}
+}
+
+// isKlog checks whether an expression is klog.Verbose or the klog package itself.
+func isKlog(expr ast.Expr, pass *analysis.Pass) bool {
+	// For klog.V(1) and klogV := klog.V(1) we can decide based on the type.
+	if typeAndValue, ok := pass.TypesInfo.Types[expr]; ok {
+		switch t := typeAndValue.Type.(type) {
+		case *types.Named:
+			if typeName := t.Obj(); typeName != nil {
+				if pkg := typeName.Pkg(); pkg != nil {
+					if typeName.Name() == "Verbose" && pkg.Path() == "k8s.io/klog/v2" {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	// In "klog.Info", "klog" is a package identifier. It doesn't need to
+	// be "klog" because here we look up the actual package.
+	if ident, ok := expr.(*ast.Ident); ok {
+		if object, ok := pass.TypesInfo.Uses[ident]; ok {
+			switch object := object.(type) {
+			case *types.PkgName:
+				pkg := object.Imported()
+				if pkg.Path() == "k8s.io/klog/v2" {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func isUnstructured(fName string) bool {

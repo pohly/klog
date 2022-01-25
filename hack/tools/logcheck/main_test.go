@@ -47,6 +47,16 @@ func TestAnalyzer(t *testing.T) {
 			filter:            "testdata/src/mixed/structured_logging",
 			testPackage:       "mixed",
 		},
+		{
+			name:              "importrename",
+			allowUnstructured: "false",
+			testPackage:       "importrename",
+		},
+		{
+			name:              "verbose",
+			allowUnstructured: "false",
+			testPackage:       "verbose",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
