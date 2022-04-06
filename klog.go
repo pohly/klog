@@ -246,6 +246,10 @@ func (m *moduleSpec) String() string {
 	// Lock because the type is not atomic. TODO: clean this up.
 	logging.mu.Lock()
 	defer logging.mu.Unlock()
+	return m.serialize()
+}
+
+func (m *moduleSpec) serialize() string {
 	var b bytes.Buffer
 	for i, f := range m.filter {
 		if i > 0 {
@@ -267,6 +271,17 @@ var errVmoduleSyntax = errors.New("syntax error: expect comma-separated list of 
 // Set will sets module value
 // Syntax: -vmodule=recordio=2,file=1,gfs*=3
 func (m *moduleSpec) Set(value string) error {
+	filter, err := parseModuleSpec(value)
+	if err != nil {
+		return err
+	}
+	logging.mu.Lock()
+	defer logging.mu.Unlock()
+	logging.setVState(logging.verbosity, filter, true)
+	return nil
+}
+
+func parseModuleSpec(value string) ([]modulePat, error) {
 	var filter []modulePat
 	for _, pat := range strings.Split(value, ",") {
 		if len(pat) == 0 {
@@ -275,15 +290,15 @@ func (m *moduleSpec) Set(value string) error {
 		}
 		patLev := strings.Split(pat, "=")
 		if len(patLev) != 2 || len(patLev[0]) == 0 || len(patLev[1]) == 0 {
-			return errVmoduleSyntax
+			return nil, errVmoduleSyntax
 		}
 		pattern := patLev[0]
 		v, err := strconv.ParseInt(patLev[1], 10, 32)
 		if err != nil {
-			return errors.New("syntax error: expect comma-separated list of filename=N")
+			return nil, errors.New("syntax error: expect comma-separated list of filename=N")
 		}
 		if v < 0 {
-			return errors.New("negative value for vmodule level")
+			return nil, errors.New("negative value for vmodule level")
 		}
 		if v == 0 {
 			continue // Ignore. It's harmless but no point in paying the overhead.
@@ -291,10 +306,7 @@ func (m *moduleSpec) Set(value string) error {
 		// TODO: check syntax of filter?
 		filter = append(filter, modulePat{pattern, isLiteral(pattern), Level(v)})
 	}
-	logging.mu.Lock()
-	defer logging.mu.Unlock()
-	logging.setVState(logging.verbosity, filter, true)
-	return nil
+	return filter, nil
 }
 
 // isLiteral reports whether the pattern is a literal string, that is, has no metacharacters
@@ -523,6 +535,74 @@ func (l *loggingT) setVState(verbosity Level, filter []modulePat, setFilter bool
 }
 
 var timeNow = time.Now // Stubbed out for testing.
+
+// CaptureState gathers information about all current klog settings and
+// returns a function that, when called, restores those settings.
+// This does not invalidate caches.
+func CaptureState() func() {
+	logging.mu.Lock()
+	defer logging.mu.Unlock()
+	flushDRunning := logging.flushD.isRunning()
+	moduleSpec := logging.vmodule.serialize()
+	logger := globalLogger
+	loggerOptions := globalLoggerOptions
+	maxSize := MaxSize
+	state := loggingT{
+		toStderr:         logging.toStderr,
+		alsoToStderr:     logging.alsoToStderr,
+		stderrThreshold:  logging.stderrThreshold,
+		file:             logging.file,
+		flushInterval:    logging.flushInterval,
+		traceLocation:    logging.traceLocation,
+		verbosity:        logging.verbosity,
+		logDir:           logging.logDir,
+		logFile:          logging.logFile,
+		logFileMaxSizeMB: logging.logFileMaxSizeMB,
+		skipHeaders:      logging.skipHeaders,
+		skipLogHeaders:   logging.skipLogHeaders,
+		addDirHeader:     logging.addDirHeader,
+		oneOutput:        logging.oneOutput,
+		filter:           logging.filter,
+	}
+	return func() {
+		// This needs to be done before mutex locking.
+		if flushDRunning && !logging.flushD.isRunning() {
+			// This is not quite accurate: StartFlushDaemon might
+			// have been called with some different interval.
+			interval := state.flushInterval
+			if interval == 0 {
+				interval = flushInterval
+			}
+			logging.flushD.run(interval)
+		} else if !flushDRunning && logging.flushD.isRunning() {
+			logging.flushD.stop()
+		}
+
+		logging.mu.Lock()
+		defer logging.mu.Unlock()
+
+		logging.toStderr = state.toStderr
+		logging.alsoToStderr = state.alsoToStderr
+		logging.stderrThreshold = state.stderrThreshold
+		logging.file = state.file
+		logging.flushInterval = state.flushInterval
+		logging.traceLocation = state.traceLocation
+		logging.verbosity = state.verbosity
+		logging.logDir = state.logDir
+		logging.logFile = state.logFile
+		logging.logFileMaxSizeMB = state.logFileMaxSizeMB
+		logging.skipHeaders = state.skipHeaders
+		logging.skipLogHeaders = state.skipLogHeaders
+		logging.addDirHeader = state.addDirHeader
+		logging.oneOutput = state.oneOutput
+		logging.filter = state.filter
+		filter, _ := parseModuleSpec(moduleSpec)
+		logging.setVState(state.verbosity, filter, true)
+		globalLogger = logger
+		globalLoggerOptions = loggerOptions
+		MaxSize = maxSize
+	}
+}
 
 /*
 header formats a log header as defined by the C++ implementation.

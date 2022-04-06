@@ -105,6 +105,7 @@ func setFlags() {
 
 // Test that Info works as advertised.
 func TestInfo(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	Info("test")
@@ -117,6 +118,7 @@ func TestInfo(t *testing.T) {
 }
 
 func TestInfoDepth(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 
@@ -176,6 +178,7 @@ func TestCopyStandardLogToPanic(t *testing.T) {
 
 // Test that using the standard log package logs to INFO.
 func TestStandardLog(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	stdLog.Print("test")
@@ -189,6 +192,7 @@ func TestStandardLog(t *testing.T) {
 
 // Test that the header has the correct format.
 func TestHeader(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	defer func(previous func() time.Time) { timeNow = previous }(timeNow)
@@ -212,6 +216,7 @@ func TestHeader(t *testing.T) {
 }
 
 func TestHeaderWithDir(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	logging.addDirHeader = true
 	defer logging.swap(logging.newBuffers())
@@ -231,6 +236,7 @@ func TestHeaderWithDir(t *testing.T) {
 // Even in the Info log, the source character will be E, so the data should
 // all be identical.
 func TestError(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	Error("test")
@@ -253,13 +259,10 @@ func TestError(t *testing.T) {
 // Even in the Info log, the source character will be E, so the data should
 // all be identical.
 func TestErrorWithOneOutput(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	logging.oneOutput = true
-	buf := logging.newBuffers()
-	defer func() {
-		logging.swap(buf)
-		logging.oneOutput = false
-	}()
+	defer logging.swap(logging.newBuffers())
 	Error("test")
 	if !contains(severity.ErrorLog, "E", t) {
 		t.Errorf("Error has wrong character: %q", contents(severity.ErrorLog))
@@ -280,6 +283,7 @@ func TestErrorWithOneOutput(t *testing.T) {
 // Even in the Info log, the source character will be W, so the data should
 // all be identical.
 func TestWarning(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	Warning("test")
@@ -299,13 +303,10 @@ func TestWarning(t *testing.T) {
 // Even in the Info log, the source character will be W, so the data should
 // all be identical.
 func TestWarningWithOneOutput(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	logging.oneOutput = true
-	buf := logging.newBuffers()
-	defer func() {
-		logging.swap(buf)
-		logging.oneOutput = false
-	}()
+	defer logging.swap(logging.newBuffers())
 	Warning("test")
 	if !contains(severity.WarningLog, "W", t) {
 		t.Errorf("Warning has wrong character: %q", contents(severity.WarningLog))
@@ -321,10 +322,10 @@ func TestWarningWithOneOutput(t *testing.T) {
 
 // Test that a V log goes to Info.
 func TestV(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	logging.verbosity.Set("2")
-	defer logging.verbosity.Set("0")
 	V(2).Info("test")
 	if !contains(severity.InfoLog, "I", t) {
 		t.Errorf("Info has wrong character: %q", contents(severity.InfoLog))
@@ -336,10 +337,10 @@ func TestV(t *testing.T) {
 
 // Test that a vmodule enables a log in this file.
 func TestVmoduleOn(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	logging.vmodule.Set("klog_test=2")
-	defer logging.vmodule.Set("")
 	if !V(1).Enabled() {
 		t.Error("V not enabled for 1")
 	}
@@ -360,10 +361,10 @@ func TestVmoduleOn(t *testing.T) {
 
 // Test that a vmodule of another file does not enable a log in this file.
 func TestVmoduleOff(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	logging.vmodule.Set("notthisfile=2")
-	defer logging.vmodule.Set("")
 	for i := 1; i <= 3; i++ {
 		if V(Level(i)).Enabled() {
 			t.Errorf("V enabled for %d", i)
@@ -376,6 +377,7 @@ func TestVmoduleOff(t *testing.T) {
 }
 
 func TestSetOutputDataRace(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	var wg sync.WaitGroup
@@ -416,6 +418,7 @@ func TestSetOutputDataRace(t *testing.T) {
 }
 
 func TestLogToOutput(t *testing.T) {
+	defer CaptureState()()
 	logging.toStderr = true
 	defer logging.swap(logging.newBuffers())
 	buf := new(bytes.Buffer)
@@ -450,9 +453,9 @@ var vGlobs = map[string]bool{
 
 // Test that vmodule globbing works as advertised.
 func testVmoduleGlob(pat string, match bool, t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
-	defer logging.vmodule.Set("")
 	logging.vmodule.Set(pat)
 	if V(2).Enabled() != match {
 		t.Errorf("incorrect match for %q: got %#v expected %#v", pat, V(2), match)
@@ -467,13 +470,13 @@ func TestVmoduleGlob(t *testing.T) {
 }
 
 func TestRollover(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	var err error
 	defer func(previous func(error)) { logExitFunc = previous }(logExitFunc)
 	logExitFunc = func(e error) {
 		err = e
 	}
-	defer func(previous uint64) { MaxSize = previous }(MaxSize)
 	MaxSize = 512
 	Info("x") // Be sure we have a file.
 	info, ok := logging.file[severity.InfoLog].(*syncBuffer)
@@ -516,6 +519,7 @@ func TestOpenAppendOnStart(t *testing.T) {
 		y string = "yyyyyyyyyy"
 	)
 
+	defer CaptureState()()
 	setFlags()
 	var err error
 	defer func(previous func(error)) { logExitFunc = previous }(logExitFunc)
@@ -580,6 +584,7 @@ func TestOpenAppendOnStart(t *testing.T) {
 }
 
 func TestLogBacktraceAt(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	// The peculiar style of this code simplifies line counting and maintenance of the
@@ -660,6 +665,7 @@ func BenchmarkKObj(b *testing.B) {
 }
 
 func BenchmarkLogs(b *testing.B) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 
@@ -688,6 +694,7 @@ func BenchmarkLogs(b *testing.B) {
 
 // Test the logic on checking log size limitation.
 func TestFileSizeCheck(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	testData := map[string]struct {
 		testLogFile          string
@@ -750,6 +757,7 @@ func TestInitFlags(t *testing.T) {
 }
 
 func TestInfoObjectRef(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 
@@ -879,6 +887,7 @@ func TestKRef(t *testing.T) {
 
 // Test that InfoS and InfoSDepth work as advertised.
 func TestInfoS(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	timeNow = func() time.Time {
@@ -935,6 +944,7 @@ func TestInfoS(t *testing.T) {
 
 // Test that Verbose.InfoS works as advertised.
 func TestVInfoS(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	timeNow = func() time.Time {
@@ -990,7 +1000,6 @@ second value line`},
 	}
 
 	logging.verbosity.Set("2")
-	defer logging.verbosity.Set("0")
 
 	for l := Level(0); l < Level(4); l++ {
 		for _, data := range testDataInfo {
@@ -1019,6 +1028,7 @@ second value line`},
 
 // Test that ErrorS and ErrorSDepth work as advertised.
 func TestErrorS(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	timeNow = func() time.Time {
@@ -1147,10 +1157,10 @@ func (f *sampleLogFilter) FilterS(msg string, keysAndValues []interface{}) (stri
 }
 
 func TestLogFilter(t *testing.T) {
+	defer CaptureState()()
 	setFlags()
 	defer logging.swap(logging.newBuffers())
 	SetLogFilter(&sampleLogFilter{})
-	defer SetLogFilter(nil)
 	funcs := []struct {
 		name     string
 		logFunc  func(args ...interface{})
@@ -1316,8 +1326,8 @@ func TestInfoWithLogr(t *testing.T) {
 	for _, data := range testDataInfo {
 		t.Run(data.msg, func(t *testing.T) {
 			l := logr.New(logger)
+			defer CaptureState()()
 			SetLogger(l)
-			defer ClearLogger()
 			defer logger.reset()
 
 			Info(data.msg)
@@ -1356,9 +1366,9 @@ func TestInfoSWithLogr(t *testing.T) {
 
 	for _, data := range testDataInfo {
 		t.Run(data.msg, func(t *testing.T) {
+			defer CaptureState()()
 			l := logr.New(logger)
 			SetLogger(l)
-			defer ClearLogger()
 			defer logger.reset()
 
 			InfoS(data.msg, data.keysValues...)
@@ -1424,9 +1434,9 @@ func TestErrorSWithLogr(t *testing.T) {
 
 	for _, data := range testDataInfo {
 		t.Run(data.msg, func(t *testing.T) {
+			defer CaptureState()()
 			l := logr.New(logger)
 			SetLogger(l)
-			defer ClearLogger()
 			defer logger.reset()
 
 			ErrorS(data.err, data.msg, data.keysValues...)
@@ -1483,8 +1493,8 @@ func TestCallDepthLogr(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			l := logr.New(logger)
-			SetLogger(l)
 			defer ClearLogger()
+			SetLogger(l)
 			defer logger.reset()
 			defer logger.resetCallDepth()
 
@@ -1505,8 +1515,8 @@ func TestCallDepthLogrInfoS(t *testing.T) {
 	logger := &callDepthTestLogr{}
 	logger.resetCallDepth()
 	l := logr.New(logger)
+	defer CaptureState()()
 	SetLogger(l)
-	defer ClearLogger()
 
 	// Add wrapper to ensure callDepthTestLogr +2 offset is correct.
 	logFunc := func() {
@@ -1528,8 +1538,8 @@ func TestCallDepthLogrErrorS(t *testing.T) {
 	logger := &callDepthTestLogr{}
 	logger.resetCallDepth()
 	l := logr.New(logger)
+	defer CaptureState()()
 	SetLogger(l)
-	defer ClearLogger()
 
 	// Add wrapper to ensure callDepthTestLogr +2 offset is correct.
 	logFunc := func() {
@@ -1548,11 +1558,11 @@ func TestCallDepthLogrErrorS(t *testing.T) {
 }
 
 func TestCallDepthLogrGoLog(t *testing.T) {
+	defer CaptureState()()
 	logger := &callDepthTestLogr{}
 	logger.resetCallDepth()
 	l := logr.New(logger)
 	SetLogger(l)
-	defer ClearLogger()
 	CopyStandardLogTo("INFO")
 
 	// Add wrapper to ensure callDepthTestLogr +2 offset is correct.
@@ -1919,5 +1929,80 @@ func TestStopFlushDaemon(t *testing.T) {
 	StopFlushDaemon()
 	if logging.flushD.isRunning() {
 		t.Error("expected flushD to be stopped")
+	}
+}
+
+func TestCaptureState(t *testing.T) {
+	var fs flag.FlagSet
+	InitFlags(&fs)
+
+	// Capture state.
+	oldState := map[string]string{}
+	fs.VisitAll(func(f *flag.Flag) {
+		oldState[f.Name] = f.Value.String()
+	})
+	originalLogger := Background()
+
+	// And through dedicated API.
+	// Ensure we always restore.
+	restore := CaptureState()
+	defer restore()
+
+	// Change state.
+	for name, value := range map[string]string{
+		// All of these are non-standard values.
+		"v":                 "10",
+		"vmodule":           "abc=2",
+		"log_dir":           "/tmp",
+		"log_file_max_size": "10",
+		"logtostderr":       "false",
+		"alsologtostderr":   "true",
+		"add_dir_header":    "true",
+		"skip_headers":      "true",
+		"one_output":        "true",
+		"skip_log_headers":  "true",
+		"stderrthreshold":   "1",
+		"log_backtrace_at":  "foobar.go:100",
+	} {
+		f := fs.Lookup(name)
+		if f == nil {
+			t.Fatalf("could not look up %q", name)
+		}
+		currentValue := f.Value.String()
+		if currentValue == value {
+			t.Fatalf("%q is already set to non-default %q?!", name, value)
+		}
+		if err := f.Value.Set(value); err != nil {
+			t.Fatalf("setting %q to %q: %v", name, value, err)
+		}
+	}
+	StartFlushDaemon(time.Minute)
+	if !logging.flushD.isRunning() {
+		t.Error("Flush daemon should have been started.")
+	}
+	logger := logr.Discard()
+	SetLoggerWithOptions(logger, ContextualLogger(true))
+	actualLogger := Background()
+	if logger != actualLogger {
+		t.Errorf("Background logger should be %v, got %v", logger, actualLogger)
+	}
+
+	// Let klog restore the state.
+	restore()
+
+	// Verify that the original state is back.
+	fs.VisitAll(func(f *flag.Flag) {
+		oldValue := oldState[f.Name]
+		currentValue := f.Value.String()
+		if oldValue != currentValue {
+			t.Errorf("%q should have been restored to %q, is %q instead", f.Name, oldValue, currentValue)
+		}
+	})
+	if logging.flushD.isRunning() {
+		t.Error("Flush daemon should have been stopped.")
+	}
+	actualLogger = Background()
+	if originalLogger != actualLogger {
+		t.Errorf("Background logger should be %v, got %v", originalLogger, actualLogger)
 	}
 }
