@@ -632,6 +632,7 @@ func BenchmarkHeaderWithDir(b *testing.B) {
 
 // Ensure that benchmarks have side effects to avoid compiler optimization
 var result ObjectRef
+var results []ObjectRef
 var enabled bool
 
 func BenchmarkV(b *testing.B) {
@@ -657,6 +658,21 @@ func BenchmarkKObj(b *testing.B) {
 		r = KObj(&a)
 	}
 	result = r
+}
+
+func BenchmarkKObjs(b *testing.B) {
+	arg := make([]KMetadata, 0)
+	for i := 0; i < 1000; i++ {
+		a := test.KMetadataMock{Name: "a" + strconv.Itoa(i), NS: "a"}
+		arg = append(arg, a)
+	}
+
+	b.ResetTimer()
+	var r []ObjectRef
+	for i := 0; i < b.N; i++ {
+		r = KObjs(arg)
+	}
+	results = r
 }
 
 func BenchmarkLogs(b *testing.B) {
