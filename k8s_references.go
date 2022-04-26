@@ -25,22 +25,21 @@ import (
 
 // ObjectRef references a kubernetes object
 type ObjectRef struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace,omitempty"`
+	KMetadata
 }
 
 func (ref ObjectRef) String() string {
-	if ref.Namespace != "" {
-		return fmt.Sprintf("%s/%s", ref.Namespace, ref.Name)
+	namespace := ref.GetNamespace()
+	if namespace != "" {
+		return fmt.Sprintf("%s/%s", namespace, ref.GetName())
 	}
-	return ref.Name
+	return ref.GetName()
 }
 
 // MarshalLog ensures that loggers with support for structured output will log
 // as a struct by removing the String method via a custom type.
 func (ref ObjectRef) MarshalLog() interface{} {
-	type or ObjectRef
-	return or(ref)
+	return objectRef{name: ref.GetName(), namespace: ref.GetNamespace()}
 }
 
 var _ logr.Marshaler = ObjectRef{}
@@ -62,18 +61,27 @@ func KObj(obj KMetadata) ObjectRef {
 		return ObjectRef{}
 	}
 
-	return ObjectRef{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}
+	return ObjectRef{KMetadata: obj}
 }
 
 // KRef returns ObjectRef from name and namespace
 func KRef(namespace, name string) ObjectRef {
-	return ObjectRef{
-		Name:      name,
-		Namespace: namespace,
-	}
+	return KObj(objectRef{
+		name:      name,
+		namespace: namespace,
+	})
+}
+
+type objectRef struct {
+	name, namespace string
+}
+
+func (o objectRef) GetNamespace() string {
+	return o.namespace
+}
+
+func (o objectRef) GetName() string {
+	return o.name
 }
 
 // KObjs returns slice of ObjectRef from an slice of ObjectMeta
