@@ -17,7 +17,10 @@ limitations under the License.
 package klog_test
 
 import (
+	"context"
 	"fmt"
+	"runtime"
+	"testing"
 
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
@@ -56,3 +59,76 @@ func ExampleFlushLogger() {
 	// Output:
 	// flushing...
 }
+
+func BenchmarkPassingLogger(b *testing.B) {
+	b.Run("context", func(b *testing.B) {
+		ctx := klog.NewContext(context.Background(), klog.Background())
+		var finalCtx context.Context
+		for n := b.N; n > 0; n-- {
+			finalCtx = passCtx(ctx)
+		}
+		runtime.KeepAlive(finalCtx)
+	})
+
+	b.Run("directly", func(b *testing.B) {
+		logger := klog.Background()
+		var finalLogger klog.Logger
+		for n := b.N; n > 0; n-- {
+			finalLogger = passLogger(logger)
+		}
+		runtime.KeepAlive(finalLogger)
+	})
+
+	b.Run("getter", func(b *testing.B) {
+		logGetter := klog.LoggerInstance{klog.Background()}
+		var finalLogGetter klog.LogGetter
+		for n := b.N; n > 0; n-- {
+			finalLogGetter = passLogGetter(logGetter)
+		}
+		runtime.KeepAlive(finalLogGetter)
+	})
+}
+
+func BenchmarkExtractLogger(b *testing.B) {
+	b.Run("context", func(b *testing.B) {
+		ctx := klog.NewContext(context.Background(), klog.Background())
+		var finalLogger klog.Logger
+		for n := b.N; n > 0; n-- {
+			finalLogger = extractCtx(ctx)
+		}
+		runtime.KeepAlive(finalLogger)
+	})
+
+	b.Run("directly", func(b *testing.B) {
+		logger := klog.Background()
+		var finalLogger klog.Logger
+		for n := b.N; n > 0; n-- {
+			finalLogger = passLogger(logger)
+		}
+		runtime.KeepAlive(finalLogger)
+	})
+
+	b.Run("getter", func(b *testing.B) {
+		logGetter := klog.LoggerInstance{klog.Background()}
+		var finalLogger klog.Logger
+		for n := b.N; n > 0; n-- {
+			finalLogger = extractLogGetter(logGetter)
+		}
+		runtime.KeepAlive(finalLogger)
+	})
+}
+
+//go:noinline
+func passCtx(ctx context.Context) context.Context { return ctx }
+
+//go:noinline
+func extractCtx(ctx context.Context) klog.Logger { return klog.FromContext(ctx) }
+
+//go:noinline
+func passLogger(logger klog.Logger) klog.Logger { return logger }
+
+//go:noinline
+func passLogGetter(logGetter klog.LogGetter) klog.LogGetter { return logGetter }
+
+//go:noinline
+func extractLogGetter(logGetter klog.LogGetter) klog.Logger { return logGetter.GetLogr() }

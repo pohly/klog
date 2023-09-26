@@ -210,3 +210,33 @@ func NewContext(ctx context.Context, logger Logger) context.Context {
 	}
 	return ctx
 }
+
+// LogGetter is an interface for retrieving a logger if (and only if) needed.
+// An API can use this interface to accept either a context or a logger instance:
+//
+//     func myFunc(logGetter klog.LogGetter) { logGetter.GetLogr().Info("hello world") }
+//     ...
+//     myFunc(klog.ContextLogger(ctx))
+//     myFunc(klog.LoggerInstance(logger))
+type LogGetter interface {
+	// GetLogr returns a logger.
+	GetLogr() Logger
+}
+
+// ContextLogger is an adapter which implements LogGetter for a context.
+type ContextLogger struct {
+	context.Context
+}
+
+var _ LogGetter = ContextLogger{}
+
+func (c ContextLogger) GetLogr() Logger { return FromContext(c.Context) }
+
+// LoggerInstance is an adapter which implements LogGetter for a Logger instance.
+type LoggerInstance struct {
+	Logger
+}
+
+var _ LogGetter = LoggerInstance{}
+
+func (l LoggerInstance) GetLogr() Logger { return l.Logger }
