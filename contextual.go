@@ -81,8 +81,16 @@ func SetLoggerWithOptions(logger logr.Logger, opts ...LoggerOption) {
 }
 
 // ContextualLogger determines whether the logger passed to
-// SetLoggerWithOptions may also get called directly. Such a logger cannot rely
-// on verbosity checking in klog.
+// SetLoggerWithOptions may also get called directly. Such a logger
+// may get called in two ways:
+// - directly by application code
+// - indirectly by klog when application code uses klog logging methods
+//
+// Verbosity checking in the first case must be handled by the logger.
+// In the second case, klog does its own verbosity checking.
+//
+// This implies that verbosity settings of the logger and of klog must
+// be kept consistent.
 func ContextualLogger(enabled bool) LoggerOption {
 	return func(o *loggerOptions) {
 		o.contextualLogger = enabled
